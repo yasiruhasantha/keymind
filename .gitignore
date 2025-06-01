@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE / Editor specific
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Virtual environment
+venv/
+.venv/
+env/
+.env/
+ENV/
+# If your venv is named something else, add it here:
+# my_custom_venv_name/
+
+# User-specific configuration folder (created by the script)
+user_config/
+
+# If you create a folder for compiled binaries or executables
+dist/
+build/
+*.exe
+*.app
+*.dmg
+
+# Log files
+*.log
+
+# Test output
+htmlcov/
+.pytest_cache/
+.tox/
+.coverage
+.coverage.*
+nosetests.xml
+coverage.xml
