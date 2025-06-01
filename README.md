@@ -1,4 +1,4 @@
-# KeyMind
+# Keymind
 
 A productivity-focused application that helps users maintain focus by monitoring active windows and managing distractions. Built with Python and CustomTkinter.
 
