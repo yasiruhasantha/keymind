@@ -90,7 +90,7 @@ class App(ctk.CTk):
         settings_frame.grid_columnconfigure(1, weight=1)
 
         # API Key Section
-        api_key_label = ctk.CTkLabel(settings_frame, text="OpenAI API Key", anchor="w")
+        api_key_label = ctk.CTkLabel(settings_frame, text="Gemini API Key", anchor="w")
         api_key_label.grid(row=0, column=0, padx=(20,10), pady=20, sticky="w")
 
         self.api_key_entry = ctk.CTkEntry(settings_frame, placeholder_text="Enter your API key", width=350)
