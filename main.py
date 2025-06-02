@@ -1,6 +1,7 @@
 import customtkinter as ctk
 import config_manager
 from app_logic import WindowMonitor
+import time
 
 # --- Appearance Settings ---
 ctk.set_appearance_mode("Dark")
@@ -37,11 +38,27 @@ class App(ctk.CTk):
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     def update_window_title(self):
-        """Update the displayed window title."""
+        """Update the displayed window title and check task relevance."""
+        from app_logic.task_checker import check_relevance
+        
         title = self.window_monitor.get_active_window_title()
+        current_time = time.time()
+        
         if title and title != self.current_active_window_title:
             self.current_active_window_title = title
             self.active_window_display_label.configure(text=title)
+            
+            # Check relevance if monitoring is active and we have a task
+            if hasattr(self, 'monitoring_active') and self.monitoring_active:
+                if hasattr(self, 'last_activity') and title != self.last_activity:
+                    # Wait 5 seconds before checking new activity
+                    if current_time - getattr(self, 'last_check_time', 0) >= 5:
+                        relevance = check_relevance(self.current_task, title)
+                        if relevance is not None:
+                            print(f"Relevance check: {'Relevant' if relevance == 1 else 'Not relevant'}")
+                        self.last_check_time = current_time
+                        self.last_activity = title
+                        
         self.after(200, self.update_window_title)
 
     def apply_loaded_settings(self):
@@ -71,18 +88,44 @@ class App(ctk.CTk):
 
     def setup_home_tab(self):
         home_frame = self.tab_view.tab("home")
-        home_frame.grid_rowconfigure(0, weight=1)
-        home_frame.grid_rowconfigure(1, weight=0)
-        home_frame.grid_rowconfigure(2, weight=1)
+        home_frame.grid_rowconfigure((0,1,2,3), weight=1)
         home_frame.grid_columnconfigure(0, weight=1)
 
+        # Task label at the top
+        task_label = ctk.CTkLabel(
+            home_frame,
+            text="Enter your task:",
+            font=ctk.CTkFont(size=24, weight="bold")
+        )
+        task_label.grid(row=0, column=0, padx=20, pady=(100, 0))
+
+        # Task input below label
+        self.task_entry = ctk.CTkEntry(
+            home_frame,
+            width=400,
+            height=35
+        )
+        self.task_entry.grid(row=1, column=0, padx=20, pady=(20, 0))
+
+        # Start button below input
+        self.start_button = ctk.CTkButton(
+            home_frame,
+            text="Start",
+            width=150,
+            height=40,
+            font=ctk.CTkFont(size=15),
+            command=self.on_start_button_press
+        )
+        self.start_button.grid(row=2, column=0, pady=(20, 0))
+
+        # Current activity at bottom
         self.active_window_display_label = ctk.CTkLabel(
             home_frame, 
-            text=self.current_active_window_title, 
-            font=ctk.CTkFont(size=20, weight="bold"),
+            text="current activity",
+            font=ctk.CTkFont(size=20),
             wraplength=500
         )
-        self.active_window_display_label.grid(row=0, column=0, pady=(150, 20), padx=20, sticky="s")
+        self.active_window_display_label.grid(row=3, column=0, pady=(50, 20))
 
     def setup_settings_tab(self):
         settings_frame = self.tab_view.tab("settings")
@@ -156,6 +199,23 @@ class App(ctk.CTk):
         print("Cancel button pressed!")
         self.apply_loaded_settings()
         print("UI changes reverted to last saved state.")
+
+    def on_start_button_press(self):
+        """Handle start button press."""
+        if self.start_button.cget("text") == "Start":
+            self.current_task = self.task_entry.get()
+            if not self.current_task:
+                print("Please enter a task first")
+                return
+                
+            print("Task started:", self.current_task)
+            self.monitoring_active = True
+            self.last_check_time = 0
+            self.last_activity = ""
+            self.start_button.configure(text="Stop")
+        else:
+            self.monitoring_active = False
+            self.start_button.configure(text="Start")
 
 if __name__ == "__main__":
     config_manager.ensure_config_directory_exists()
