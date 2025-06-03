@@ -43,7 +43,6 @@ class App(ctk.CTk):
         
         title = self.window_monitor.get_active_window_title()
         current_time = time.time()
-        
         if title and title != self.current_active_window_title:
             self.current_active_window_title = title
             self.active_window_display_label.configure(text=title)
@@ -51,14 +50,49 @@ class App(ctk.CTk):
             # Check relevance if monitoring is active and we have a task
             if hasattr(self, 'monitoring_active') and self.monitoring_active:
                 if hasattr(self, 'last_activity') and title != self.last_activity:
-                    # Wait 5 seconds before checking new activity
-                    if current_time - getattr(self, 'last_check_time', 0) >= 5:
-                        relevance = check_relevance(self.current_task, title)
-                        if relevance is not None:
-                            print(f"Relevance check: {title} - {'Relevant' if relevance == 1 else 'Not relevant'}")
+                    # Wait 5 seconds before checking new activity                    if current_time - getattr(self, 'last_check_time', 0) >= 5:
+                        # Load current settings
+                        settings = config_manager.load_settings()
+                        allowed = settings.get('allowed', [])
+                        banned = settings.get('banned', [])
+                        browsers = settings.get('browsers', [])
+
+                        # Check if activity is in allowed list
+                        if any(allowed_app.lower() in title.lower() for allowed_app in allowed):
+                            print(f"Relevance check: {title} - Relevant (in allowed list)")
+                            relevance = 1
+                        # Check if activity is in banned list
+                        elif any(banned_app.lower() in title.lower() for banned_app in banned):
+                            print(f"Relevance check: {title} - Not relevant (in banned list)")
+                            relevance = 0
+                        # If not in either list, use AI to check relevance
+                        else:
+                            relevance = check_relevance(self.current_task, title)
+                            if relevance is not None:
+                                print(f"Relevance check: {title} - {'Relevant' if relevance == 1 else 'Not relevant'} (AI decision)")
+                        
+                        # If activity is not relevant, close it
+                        if relevance == 0:
+                            import pyautogui
+                            pyautogui.PAUSE = 0.5  # Add a small delay between actions
+                            
+                            # Check if it's a browser by looking at the process name or window title
+                            title_lower = title.lower()
+                            is_browser = any(browser.lower() in title_lower for browser in browsers)
+                            
+                            if is_browser:
+                                # For browsers, close tab with Ctrl+W and open new tab with Ctrl+T
+                                print(f"Closing browser tab: {title}")
+                                pyautogui.hotkey('ctrl', 'w')
+                                pyautogui.hotkey('ctrl', 't')
+                            else:
+                                # For other applications, use Alt+F4
+                                print(f"Closing application: {title}")
+                                pyautogui.hotkey('alt', 'f4')
+                        
                         self.last_check_time = current_time
                         self.last_activity = title
-                        
+
         self.after(200, self.update_window_title)
 
     def apply_loaded_settings(self):
@@ -66,19 +100,28 @@ class App(ctk.CTk):
         print("Loading settings into UI...")
         loaded_config = config_manager.load_settings()
 
+        # Apply API key
         self.api_key_entry.delete(0, "end")
         self.api_key_entry.insert(0, loaded_config.get("api_key", ""))
 
-        browsers_config = loaded_config.get("web_browsers", {})
-        for browser, checkbox in [
-            ("chrome", self.chrome_checkbox),
-            ("opera", self.opera_checkbox),
-            ("firefox", self.firefox_checkbox)
-        ]:
-            if browsers_config.get(browser, True):
-                checkbox.select()
-            else:
-                checkbox.deselect()
+        # Apply browsers
+        self.browsers_entry.delete(0, "end")
+        browsers = loaded_config.get("browsers", [])
+        if isinstance(browsers, list):
+            self.browsers_entry.insert(0, ", ".join(browsers))
+
+        # Apply banned apps
+        self.banned_entry.delete(0, "end")
+        banned = loaded_config.get("banned", [])
+        if isinstance(banned, list):
+            self.banned_entry.insert(0, ", ".join(banned))
+
+        # Apply allowed apps
+        self.allowed_entry.delete(0, "end")
+        allowed = loaded_config.get("allowed", [])
+        if isinstance(allowed, list):
+            self.allowed_entry.insert(0, ", ".join(allowed))
+
         print("Settings applied to UI.")
 
     def on_closing(self):
@@ -88,7 +131,10 @@ class App(ctk.CTk):
 
     def setup_home_tab(self):
         home_frame = self.tab_view.tab("home")
-        home_frame.grid_rowconfigure((0,1,2,3), weight=1)
+        home_frame.grid_rowconfigure(0, weight=1)
+        home_frame.grid_rowconfigure(1, weight=1)
+        home_frame.grid_rowconfigure(2, weight=1)
+        home_frame.grid_rowconfigure(3, weight=1)
         home_frame.grid_columnconfigure(0, weight=1)
 
         # Task label at the top
@@ -139,29 +185,42 @@ class App(ctk.CTk):
         self.api_key_entry = ctk.CTkEntry(settings_frame, placeholder_text="Enter your API key", width=350)
         self.api_key_entry.grid(row=0, column=1, padx=(0,20), pady=20, sticky="ew")
 
-        # Web Browsers Section
-        web_browser_label = ctk.CTkLabel(
+        # Browsers Section
+        browsers_label = ctk.CTkLabel(settings_frame, text="Browsers", anchor="w")
+        browsers_label.grid(row=1, column=0, padx=(20,10), pady=20, sticky="w")
+
+        self.browsers_entry = ctk.CTkEntry(settings_frame, placeholder_text="Enter comma-separated browser names", width=350)
+        self.browsers_entry.grid(row=1, column=1, padx=(0,20), pady=20, sticky="ew")
+
+        # Banned Section
+        banned_label = ctk.CTkLabel(settings_frame, text="Banned", anchor="w")
+        banned_label.grid(row=2, column=0, padx=(20,10), pady=20, sticky="w")
+
+        self.banned_entry = ctk.CTkEntry(settings_frame, placeholder_text="Enter comma-separated app names", width=350)
+        self.banned_entry.grid(row=2, column=1, padx=(0,20), pady=20, sticky="ew")
+
+        # Allowed Section
+        allowed_label = ctk.CTkLabel(settings_frame, text="Allowed", anchor="w")
+        allowed_label.grid(row=3, column=0, padx=(20,10), pady=20, sticky="w")
+
+        self.allowed_entry = ctk.CTkEntry(settings_frame, placeholder_text="Enter comma-separated app names", width=350)
+        self.allowed_entry.grid(row=3, column=1, padx=(0,20), pady=20, sticky="ew")
+
+        # Help text
+        help_label = ctk.CTkLabel(
             settings_frame,
-            text="Web Browsers",
-            anchor="w",
-            font=ctk.CTkFont(weight="bold")
+            text="Note: Enter app and browser names as comma-separated values.\nExample: chrome, firefox, microsoft edge",
+            text_color="gray",
+            justify="left"
         )
-        web_browser_label.grid(row=1, column=0, columnspan=2, padx=20, pady=(10,5), sticky="w")
+        help_label.grid(row=4, column=0, columnspan=2, padx=20, pady=(0,20), sticky="w")
 
-        self.chrome_checkbox = ctk.CTkCheckBox(settings_frame, text="Chrome")
-        self.chrome_checkbox.grid(row=2, column=0, columnspan=2, padx=30, pady=5, sticky="w")
-
-        self.opera_checkbox = ctk.CTkCheckBox(settings_frame, text="Opera")
-        self.opera_checkbox.grid(row=3, column=0, columnspan=2, padx=30, pady=5, sticky="w")
-
-        self.firefox_checkbox = ctk.CTkCheckBox(settings_frame, text="Firefox")
-        self.firefox_checkbox.grid(row=4, column=0, columnspan=2, padx=30, pady=5, sticky="w")
-
-        # Spacer and Buttons
+        # Spacer
         spacer_frame = ctk.CTkFrame(settings_frame, fg_color="transparent")
         spacer_frame.grid(row=5, column=0, columnspan=2, sticky="nsew")
         settings_frame.grid_rowconfigure(5, weight=1)
 
+        # Buttons
         buttons_frame = ctk.CTkFrame(settings_frame, fg_color="transparent")
         buttons_frame.grid(row=6, column=0, columnspan=2, padx=20, pady=(10,20), sticky="sw")
 
@@ -185,13 +244,14 @@ class App(ctk.CTk):
 
     def on_save_button_press(self):
         """Gathers data from UI and saves it using config_manager."""
+        # Get settings from UI
         api_key = self.api_key_entry.get()
-        chrome_selected = bool(self.chrome_checkbox.get())
-        opera_selected = bool(self.opera_checkbox.get())
-        firefox_selected = bool(self.firefox_checkbox.get())
+        browsers = [b.strip() for b in self.browsers_entry.get().split(",") if b.strip()]
+        banned = [a.strip() for a in self.banned_entry.get().split(",") if a.strip()]
+        allowed = [a.strip() for a in self.allowed_entry.get().split(",") if a.strip()]
 
         print("Saving settings...")
-        config_manager.save_settings(api_key, chrome_selected, opera_selected, firefox_selected)
+        config_manager.save_settings(api_key, browsers, banned, allowed)
         print("Settings have been saved.")
 
     def on_cancel_button_press(self):

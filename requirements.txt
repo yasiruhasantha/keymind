@@ -1,2 +1,4 @@
 customtkinter>=5.2.0
 pygetwindow>=0.0.9
+psutil>=5.9.0
+pyautogui>=0.9.54

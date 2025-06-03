@@ -25,19 +25,17 @@ def ensure_config_directory_exists():
             # Depending on the error, you might want to raise it or handle it differently
             raise # Re-raise the exception if directory creation fails critically
 
-def save_settings(api_key, chrome_selected, opera_selected, firefox_selected):
+def save_settings(api_key, browsers, banned, allowed):
     """
     Saves the provided settings to the settings file in JSON format.
     """
-    ensure_config_directory_exists() # Ensure directory is there before trying to save
+    ensure_config_directory_exists()
 
     settings_data = {
         "api_key": api_key,
-        "web_browsers": {
-            "chrome": chrome_selected,
-            "opera": opera_selected,
-            "firefox": firefox_selected,
-        }
+        "browsers": browsers,
+        "banned": banned,
+        "allowed": allowed
     }
 
     try:
@@ -55,14 +53,11 @@ def load_settings():
     Returns a dictionary with settings or default values if the file doesn't exist or is invalid.
     """
     ensure_config_directory_exists() # Good practice, though mainly for initial setup
-
     default_settings = {
         "api_key": "",
-        "web_browsers": {
-            "chrome": True,  # Default to True as in the original UI
-            "opera": True,
-            "firefox": True,
-        }
+        "browsers": [],
+        "banned": [],
+        "allowed": []
     }
 
     if not os.path.exists(SETTINGS_FILE_PATH):
@@ -72,11 +67,25 @@ def load_settings():
     try:
         with open(SETTINGS_FILE_PATH, "r") as f:
             settings_data = json.load(f)
-            # You might want to add more validation here to ensure the loaded data has the expected structure
-            if not isinstance(settings_data.get("api_key"), str): # Basic validation
+            
+            # Validate and convert settings to new format if needed
+            if not isinstance(settings_data.get("api_key"), str):
                 settings_data["api_key"] = default_settings["api_key"]
-            if not isinstance(settings_data.get("web_browsers"), dict): # Basic validation
-                settings_data["web_browsers"] = default_settings["web_browsers"]
+
+            # Convert old web_browsers format if it exists
+            if "web_browsers" in settings_data:
+                old_browsers = settings_data.pop("web_browsers")
+                if isinstance(old_browsers, dict):
+                    settings_data["browsers"] = [
+                        browser for browser, enabled in old_browsers.items() 
+                        if enabled
+                    ]
+
+            # Ensure lists exist and are valid
+            for key in ["browsers", "banned", "allowed"]:
+                if not isinstance(settings_data.get(key), list):
+                    settings_data[key] = default_settings[key]
+
             return settings_data
     except json.JSONDecodeError:
         print(f"Error decoding JSON from {SETTINGS_FILE_PATH}. Using default settings.")
