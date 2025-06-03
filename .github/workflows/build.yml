@@ -2,9 +2,9 @@ name: Build KeyMind
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
   release:
     types: [created]
 
@@ -18,7 +18,7 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -32,7 +32,7 @@ jobs:
 
       - name: Build executable
         run: |
-          pyinstaller --onefile --noconsole --clean --collect-all customtkinter --hidden-import win32process --hidden-import win32api --hidden-import win32con --name KeyMind main.py
+          pyinstaller --onefile --noconsole --clean --collect-all customtkinter --collect-all google.generativeai --collect-all google --hidden-import win32process --hidden-import win32api --hidden-import win32con --name KeyMind main.py
           dir dist
 
       - name: Upload artifact
@@ -41,12 +41,12 @@ jobs:
           name: KeyMind
           path: dist/KeyMind.exe
           if-no-files-found: error
-        
+
       - name: Create Release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v1
         with:
           files: dist/KeyMind.exe
-          tag_name: v${{ github.run_number }}
+          tag_name: v0.${{ github.run_number }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
