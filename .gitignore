@@ -3,7 +3,17 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# IDE / Editor specific
+# Build files
+build/
+dist/
+*.spec
+
+# Virtual environment
+venv/
+.env/
+env/
+
+# IDE
 .vscode/
 .idea/
 *.swp
@@ -13,24 +23,9 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Virtual environment
-venv/
-.venv/
-env/
-.env/
-ENV/
-# If your venv is named something else, add it here:
-# my_custom_venv_name/
-
-# User-specific configuration folder (created by the script)
-user_config/
-
-# If you create a folder for compiled binaries or executables
-dist/
-build/
-*.exe
-*.app
-*.dmg
+# Keep default settings but ignore user changes
+user_config/*
+!user_config/settings.json
 
 # Log files
 *.log
