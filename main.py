@@ -11,7 +11,7 @@ class App(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("KeyMind UI - Focus Assistant")
+        self.title("KeyMind - Focus Assistant")
         self.geometry("600x550")
 
         self.grid_rowconfigure(0, weight=1)
@@ -55,7 +55,7 @@ class App(ctk.CTk):
                     if current_time - getattr(self, 'last_check_time', 0) >= 5:
                         relevance = check_relevance(self.current_task, title)
                         if relevance is not None:
-                            print(f"Relevance check: {'Relevant' if relevance == 1 else 'Not relevant'}")
+                            print(f"Relevance check: {title} - {'Relevant' if relevance == 1 else 'Not relevant'}")
                         self.last_check_time = current_time
                         self.last_activity = title
                         

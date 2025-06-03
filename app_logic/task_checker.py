@@ -24,11 +24,11 @@ def check_relevance(task, activity):
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel('gemini-1.5-flash')
         
-        prompt = f"""Given a task and a current activity, determine if they are relevant to each other.
+        prompt = f"""Your job is to figure out if the give task and the activity is relevent to each other. When figuring out their relevence you can catogorize them to different categories like study, programming, gaming, entertainment, work, etc. and then decide if they are relevent to each other or not.
         Output ONLY the number 1 if relevant, or 0 if not relevant.
         
         Task: {task}
-        Current Activity: {activity}
+        Activity: {activity}
         """
         
         response = model.generate_content(prompt)
