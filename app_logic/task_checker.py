@@ -1,6 +1,7 @@
 import google.generativeai as genai
 import json
 import os
+import sys
 import logging
 
 # Set up logging
@@ -16,7 +17,15 @@ logging.basicConfig(
 def get_api_key():
     """Get Gemini API key from settings."""    
     try:
-        settings_path = os.path.join("user_config", "settings.json")
+        # Get the directory where the executable/script is located
+        if getattr(sys, 'frozen', False):
+            # If running as executable
+            base_path = os.path.dirname(sys.executable)
+        else:
+            # If running as script
+            base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            
+        settings_path = os.path.join(base_path, "user_config", "settings.json")
         logging.info(f"Looking for settings at: {os.path.abspath(settings_path)}")
         with open(settings_path, 'r') as f:
             settings = json.load(f)
