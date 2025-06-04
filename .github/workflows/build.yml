@@ -47,6 +47,6 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: dist/KeyMind.exe
-          tag_name: v0.${{ github.run_number }}
+          tag_name: v0.1.${{ github.run_number }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -29,6 +29,7 @@ user_config/*
 
 # Log files
 *.log
+keymind_ai.log
 
 # Test output
 htmlcov/

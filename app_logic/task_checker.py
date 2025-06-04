@@ -1,26 +1,46 @@
 import google.generativeai as genai
 import json
 import os
+import logging
+
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('keymind_ai.log'),
+        logging.StreamHandler()
+    ]
+)
 
 def get_api_key():
-    """Get Gemini API key from settings."""
+    """Get Gemini API key from settings."""    
     try:
         settings_path = os.path.join("user_config", "settings.json")
+        logging.info(f"Looking for settings at: {os.path.abspath(settings_path)}")
         with open(settings_path, 'r') as f:
             settings = json.load(f)
-            return settings.get("api_key", "")
+            api_key = settings.get("api_key", "")
+            if api_key:
+                logging.info("API key loaded successfully")
+            else:
+                logging.error("No API key found in settings.json")
+            return api_key
     except Exception as e:
-        print("Error loading API key:", e)
+        logging.error(f"Error loading API key: {e}")
         return ""
 
 def check_relevance(task, activity):
     """Check if current activity is relevant to the task using Gemini AI."""
+    logging.info(f"Checking relevance - Task: {task}, Activity: {activity}")
+    
     api_key = get_api_key()
     if not api_key:
-        print("No API key found")
+        logging.error("No API key found")
         return None
 
     try:
+        logging.info("Configuring Gemini AI")
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel('gemini-1.5-flash')
         
@@ -31,14 +51,18 @@ def check_relevance(task, activity):
         Activity: {activity}
         """
         
+        logging.info("Sending request to Gemini AI")
         response = model.generate_content(prompt)
         result = response.text.strip()
+        logging.info(f"Received response from Gemini AI: {result}")
         
         # Convert response to integer (1 or 0)
         try:
-            return int(result)
+            result_int = int(result)
+            logging.info(f"Parsed result: {result_int}")
+            return result_int
         except ValueError:
-            print("Invalid AI response format")
+            logging.error(f"Invalid AI response format: {result}")
             return None
             
     except Exception as e:
