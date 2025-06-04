@@ -28,11 +28,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pyinstaller
-
-      - name: Build executable
+          pip install pyinstaller      - name: Build executable
         run: |
-          pyinstaller --onefile --noconsole --clean --collect-all customtkinter --collect-all google.generativeai --collect-all google --hidden-import win32process --hidden-import win32api --hidden-import win32con --name KeyMind main.py
+          python -m PyInstaller --onefile --noconsole --clean --collect-all customtkinter --collect-all google.generativeai --collect-all google --hidden-import win32process --hidden-import win32api --hidden-import win32con --name KeyMind main.py
+          mkdir dist\user_config
+          copy user_config\settings.json dist\user_config\
           dir dist
 
       - name: Upload artifact

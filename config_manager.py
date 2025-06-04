@@ -1,14 +1,20 @@
 # File: config_manager.py
 import os
+import sys
 import json
 
 # Define the directory and file for storing configuration
 CONFIG_DIR_NAME = "user_config"
 SETTINGS_FILE_NAME = "settings.json"
 
-# Get the absolute path to the directory where this script is located
-# This ensures that CONFIG_DIR_NAME is created relative to the script's location
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Get the directory where the executable/script is located
+if getattr(sys, 'frozen', False):
+    # If running as executable
+    BASE_DIR = os.path.dirname(sys.executable)
+else:
+    # If running as script
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 CONFIG_DIR_PATH = os.path.join(BASE_DIR, CONFIG_DIR_NAME)
 SETTINGS_FILE_PATH = os.path.join(CONFIG_DIR_PATH, SETTINGS_FILE_NAME)
 
