@@ -7,8 +7,6 @@ __pycache__/
 build/
 dist/
 *.spec
-*.yml.new
-*.yml.bak
 
 # Virtual environment
 venv/
@@ -28,6 +26,7 @@ Thumbs.db
 # Keep default settings but ignore user changes
 user_config/*
 !user_config/settings.json
+user_config/settings.json
 
 # Log files
 *.log
