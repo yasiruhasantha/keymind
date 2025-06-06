@@ -18,9 +18,42 @@ else:
 CONFIG_DIR_PATH = os.path.join(BASE_DIR, CONFIG_DIR_NAME)
 SETTINGS_FILE_PATH = os.path.join(CONFIG_DIR_PATH, SETTINGS_FILE_NAME)
 
+def get_default_settings():
+    """
+    Returns the default settings that should be used when creating a new settings file.
+    """
+    return {
+        "api_key": "",
+        "browsers": [],
+        "banned": [],
+        "allowed": [
+            "new tab",
+            "keymind",
+            "explorer",
+            "start",
+            "shellhost",
+            "shell",
+            "lockapp",
+            "taskbar",
+            "task manager",
+            "settings",
+            "control panel",
+            "system",
+            "search",
+            "notification",
+            "security center",
+            "windows defender",
+            "windows security",
+            "cmd",
+            "powershell",
+            "terminal"
+        ]
+    }
+
 def ensure_config_directory_exists():
     """
     Checks if the configuration directory exists, and creates it if not.
+    Also creates a default settings.json if it doesn't exist.
     """
     if not os.path.exists(CONFIG_DIR_PATH):
         try:
@@ -28,8 +61,17 @@ def ensure_config_directory_exists():
             print(f"Configuration directory created: {CONFIG_DIR_PATH}")
         except OSError as e:
             print(f"Error creating configuration directory {CONFIG_DIR_PATH}: {e}")
-            # Depending on the error, you might want to raise it or handle it differently
-            raise # Re-raise the exception if directory creation fails critically
+            raise  # Re-raise the exception if directory creation fails critically
+    
+    # Create default settings file if it doesn't exist
+    if not os.path.exists(SETTINGS_FILE_PATH):
+        try:
+            with open(SETTINGS_FILE_PATH, 'w') as f:
+                json.dump(get_default_settings(), f, indent=4)
+            print(f"Default settings file created at: {SETTINGS_FILE_PATH}")
+        except IOError as e:
+            print(f"Error creating default settings file: {e}")
+            raise
 
 def save_settings(api_key, browsers, banned, allowed):
     """
@@ -58,13 +100,8 @@ def load_settings():
     Loads settings from the settings file.
     Returns a dictionary with settings or default values if the file doesn't exist or is invalid.
     """
-    ensure_config_directory_exists() # Good practice, though mainly for initial setup
-    default_settings = {
-        "api_key": "",
-        "browsers": [],
-        "banned": [],
-        "allowed": []
-    }
+    ensure_config_directory_exists()  # This will create default settings if they don't exist
+    default_settings = get_default_settings()
 
     if not os.path.exists(SETTINGS_FILE_PATH):
         print(f"Settings file not found at {SETTINGS_FILE_PATH}. Using default settings.")

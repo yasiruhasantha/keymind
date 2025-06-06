@@ -23,10 +23,8 @@ env/
 .DS_Store
 Thumbs.db
 
-# Keep default settings but ignore user changes
-user_config/*
-!user_config/settings.json
-user_config/settings.json
+# Ignore all user configuration
+user_config/
 
 # Log files
 *.log

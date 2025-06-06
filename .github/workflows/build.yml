@@ -33,8 +33,6 @@ jobs:
       - name: Build executable
         run: |
           python -m PyInstaller --onefile --noconsole --clean --collect-all customtkinter --collect-all google.generativeai --collect-all google --hidden-import win32process --hidden-import win32api --hidden-import win32con --name KeyMind main.py
-          mkdir dist\user_config
-          copy user_config\settings.json dist\user_config\
           dir dist
 
       - name: Upload artifact
@@ -51,4 +49,4 @@ jobs:
           files: dist/KeyMind.exe
           tag_name: v0.1.2
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
