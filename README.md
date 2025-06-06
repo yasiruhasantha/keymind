@@ -17,7 +17,7 @@ KeyMind is an AI-powered focus management tool that helps you maintain productiv
 
 ## Installation
 
-1. Download the latest release from the [Releases page](https://github.com/yourusername/keymind/releases)
+1. Download the latest release from the [Releases page](https://github.com/yasiruhasantha/keymind/releases)
 
 2. Extract the downloaded file to your desired location
 
