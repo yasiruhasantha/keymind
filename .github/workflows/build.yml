@@ -14,6 +14,7 @@ jobs:
     permissions:
       contents: write
       packages: read
+      actions: write
 
     steps:
       - name: Checkout repository
@@ -48,5 +49,6 @@ jobs:
         with:
           files: dist/KeyMind.exe
           tag_name: v0.1.2
-        env:
-          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+          draft: false
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
