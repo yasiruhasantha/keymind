@@ -2,5 +2,26 @@
     "api_key": "",
     "browsers": [],
     "banned": [],
-    "allowed": []
+    "allowed": [
+        "new tab",
+        "keymind",
+        "explorer",
+        "start",
+        "shellhost",
+        "shell",
+        "lockapp",
+        "taskbar",
+        "task manager",
+        "settings",
+        "control panel",
+        "system",
+        "search",
+        "notification",
+        "security center",
+        "windows defender",
+        "windows security",
+        "cmd",
+        "powershell",
+        "terminal"
+    ]
 }
