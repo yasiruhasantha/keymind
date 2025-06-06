@@ -21,23 +21,31 @@ KeyMind is an AI-powered focus management tool that helps you maintain productiv
 
 2. Extract the downloaded file to your desired location
 
-3. Configure your settings in `user_config/settings.json`
+3. Run the application - it will automatically create a settings file with default configurations
 
 
 ## Configuration
 
-The application can be configured through the settings tab in the UI or by editing `user_config/settings.json`:
+The application can be configured through the settings tab in the UI. Settings are stored in `user_config/settings.json`, which is automatically created with secure defaults when you first run the application.
+
+You can customize your settings either through the UI or by directly editing `user_config/settings.json`:
 
 ```json
 {
     "api_key": "YOUR_GEMINI_API_KEY",
     "browsers": ["firefox", "chrome"],
     "banned": ["games", "social media apps"],
-    "allowed": ["new tab", "keymind", "explorer", "start"]
+    "allowed": [
+        "new tab", "keymind", "explorer", "start", "shellhost",
+        "shell", "taskbar", "task manager", "settings", "control panel",
+        "system", "search", "notification", "security center",
+        "windows defender", "windows security", "cmd", "powershell",
+        "terminal"
+    ]
 }
 ```
 
-> **Important**: Make sure to include "new tab", "keymind", "explorer", "start" in the allowed list to prevent issues with basic system functionality.
+> **Note**: The application comes with a pre-configured list of allowed system applications to ensure basic system functionality remains accessible.
 
 ### Configuration Options
 
@@ -81,9 +89,10 @@ keymind/
 │   ├── monitor.py         # Window monitoring
 │   ├── task_checker.py    # AI relevance checking
 │   └── __init__.py
-├── user_config/
-│   └── settings.json      # User configuration
 └── requirements.txt       # Project dependencies
+
+Note: When you run the application, it will create a `user_config` directory
+with your personal settings file.
 ```
 
 ## Contributing
