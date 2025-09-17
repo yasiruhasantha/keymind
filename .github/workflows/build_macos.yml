@@ -52,8 +52,6 @@ jobs:
           ls -la dist
 
       - name: Upload macOS artifacts
-
-      - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
           name: KeyMind-macOS
@@ -67,5 +65,9 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: dist/KeyMind.dmg
+          tag_name: v0.1.2
+          draft: false
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
 
 
