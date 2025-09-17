@@ -13,7 +13,7 @@ KeyMind is an AI-powered focus management tool that helps you maintain productiv
 ## Requirements
 
 - Google Gemini API key
-- Windows operating system (support for other operating systems coming soon)
+- Windows or macOS (Linux support coming soon)
 
 ## Installation
 
@@ -22,6 +22,8 @@ KeyMind is an AI-powered focus management tool that helps you maintain productiv
 2. Extract the downloaded file to your desired location
 
 3. Run the application - it will automatically create a settings file with default configurations
+
+4. Bypass Gatekeeper (macOS only) – Watch this [video](https://youtu.be/biIvAM94b98) (There is no security risk because this is open source and will not try to steal your data or anything)
 
 
 ## Configuration
@@ -56,7 +58,7 @@ You can customize your settings either through the UI or by directly editing `us
 
 ## Usage
 
-1. Start the application by running `KeyMind.exe`
+1. Start the application by running `KeyMind.exe` (Windows) or `python main.py` (macOS during development)
 
 2. Enter your current task in the main window
    - Example: "Writing documentation for the project"
@@ -71,11 +73,12 @@ You can customize your settings either through the UI or by directly editing `us
 ## Dependencies
 
 - customtkinter>=5.2.0
-- pygetwindow>=0.0.9
 - psutil>=5.9.0
 - pyautogui>=0.9.54
-- pywin32>=306
 - google-generativeai>=0.3.0
+- pygetwindow>=0.0.9 (Windows)
+- pywin32>=306 (Windows)
+- pyobjc>=10.3 (macOS)
 
 ## Development
 
