@@ -27,26 +27,15 @@ def get_default_settings():
         "browsers": [],
         "banned": [],
         "allowed": [
-            "new tab",
-            "keymind",
-            "explorer",
-            "start",
-            "shellhost",
-            "shell",
-            "lockapp",
-            "taskbar",
-            "task manager",
-            "settings",
-            "control panel",
-            "system",
-            "search",
-            "notification",
-            "security center",
-            "windows defender",
-            "windows security",
-            "cmd",
-            "powershell",
-            "terminal"
+            # Cross-platform/common
+            "new tab", "keymind", "terminal",
+            # Windows
+            "explorer", "start", "shellhost", "shell", "lockapp", "taskbar", "task manager",
+            "settings", "control panel", "system", "search", "notification", "security center",
+            "windows defender", "windows security", "cmd", "powershell",
+            # macOS (Finder, System Settings, Spotlight, etc.)
+            "Finder", "System Settings", "Activity Monitor", "Spotlight", "Launchpad",
+            "Safari", "Terminal", "Console"
         ]
     }
 

@@ -30,6 +30,9 @@ def get_api_key():
         with open(settings_path, 'r') as f:
             settings = json.load(f)
             api_key = settings.get("api_key", "")
+            # Sanitize API key to avoid invalid header values
+            if isinstance(api_key, str):
+                api_key = api_key.strip()
             if api_key:
                 logging.info("API key loaded successfully")
             else:
