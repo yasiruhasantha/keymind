@@ -1,4 +1,4 @@
-# KeyMind
+# KeyMind.
 
 KeyMind is an AI-powered focus management tool that helps you maintain productivity by monitoring and managing your active windows and applications. It uses Google's Gemini AI to determine task relevance and automatically manages distracting applications and browser tabs.
 
