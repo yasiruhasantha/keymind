@@ -2,18 +2,31 @@
 import os
 import sys
 import json
+import platform
 
 # Define the directory and file for storing configuration
 CONFIG_DIR_NAME = "user_config"
 SETTINGS_FILE_NAME = "settings.json"
 
-# Get the directory where the executable/script is located
-if getattr(sys, 'frozen', False):
-    # If running as executable
-    BASE_DIR = os.path.dirname(sys.executable)
-else:
-    # If running as script
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+system_name = platform.system()
+
+def _get_user_config_base_dir():
+    """
+    Determine a user-writable base directory for config files per platform.
+    - Windows: next to executable/script (existing behavior)
+    - macOS: ~/Library/Application Support/KeyMind
+    - Linux/Other: ~/.config/keymind
+    """
+    if system_name == 'Windows':
+        if getattr(sys, 'frozen', False):
+            return os.path.dirname(sys.executable)
+        return os.path.dirname(os.path.abspath(__file__))
+    if system_name == 'Darwin':
+        return os.path.expanduser(os.path.join('~', 'Library', 'Application Support', 'KeyMind'))
+    # Linux or others
+    return os.path.expanduser(os.path.join('~', '.config', 'keymind'))
+
+BASE_DIR = _get_user_config_base_dir()
 
 CONFIG_DIR_PATH = os.path.join(BASE_DIR, CONFIG_DIR_NAME)
 SETTINGS_FILE_PATH = os.path.join(CONFIG_DIR_PATH, SETTINGS_FILE_NAME)

@@ -1,0 +1,63 @@
+name: Build KeyMind (macOS)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+      packages: read
+      actions: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build .app with PyInstaller
+        run: |
+          python -m PyInstaller \
+            --windowed \
+            --clean \
+            --collect-all customtkinter \
+            --collect-all google.generativeai \
+            --collect-all google \
+            --hidden-import AppKit \
+            --hidden-import Quartz \
+            --name KeyMind \
+            main.py
+          ls -la dist
+
+      - name: Create DMG
+        run: |
+          mkdir -p dist/dmg
+          cp -R dist/KeyMind.app dist/dmg/
+          hdiutil create -volname KeyMind -srcfolder dist/dmg -ov -format UDZO dist/KeyMind.dmg
+          ls -la dist
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: KeyMind-macOS
+          path: |
+            dist/KeyMind.app
+            dist/KeyMind.dmg
+          if-no-files-found: error
+
+

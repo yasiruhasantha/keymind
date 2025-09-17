@@ -3,13 +3,21 @@ import json
 import os
 import sys
 import logging
+import config_manager
 
-# Set up logging
+# Set up logging to user config directory to avoid bundle write issues
+try:
+    config_manager.ensure_config_directory_exists()
+    log_path = os.path.join(config_manager.CONFIG_DIR_PATH, 'keymind_ai.log')
+except Exception:
+    # Fallback to current directory if config path fails
+    log_path = 'keymind_ai.log'
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('keymind_ai.log'),
+        logging.FileHandler(log_path),
         logging.StreamHandler()
     ]
 )

@@ -23,6 +23,8 @@ KeyMind is an AI-powered focus management tool that helps you maintain productiv
 
 3. Run the application - it will automatically create a settings file with default configurations
 
+4. Bypass Gatekeeper (macOS only) – Watch this [video](https://youtu.be/biIvAM94b98) (There is no security risk because this is open source and will not try to steal your data or anything)
+
 
 ## Configuration
 
