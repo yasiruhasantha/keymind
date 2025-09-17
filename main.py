@@ -2,6 +2,8 @@ import customtkinter as ctk
 import config_manager
 from app_logic import WindowMonitor
 import time
+import threading
+import platform
 
 # --- Appearance Settings ---
 ctk.set_appearance_mode("Dark")
@@ -50,7 +52,8 @@ class App(ctk.CTk):
             # Check relevance if monitoring is active and we have a task
             if hasattr(self, 'monitoring_active') and self.monitoring_active:
                 if hasattr(self, 'last_activity') and title != self.last_activity:
-                    # Wait 5 seconds before checking new activity                    if current_time - getattr(self, 'last_check_time', 0) >= 5:
+                    # Wait 5 seconds before checking new activity
+                    if current_time - getattr(self, 'last_check_time', 0) >= 5:
                         # Load current settings
                         settings = config_manager.load_settings()
                         allowed = settings.get('allowed', [])
@@ -67,33 +70,55 @@ class App(ctk.CTk):
                             relevance = 0
                         # If not in either list, use AI to check relevance
                         else:
-                            relevance = check_relevance(self.current_task, title)
-                            if relevance is not None:
-                                print(f"Relevance check: {title} - {'Relevant' if relevance == 1 else 'Not relevant'} (AI decision)")
+                            # Run AI call in a background thread to keep UI responsive
+                            def run_ai_check(task, activity):
+                                result = check_relevance(task, activity)
+                                def update_from_ai():
+                                    if result is not None and self.current_active_window_title == activity:
+                                        print(f"Relevance check: {activity} - {'Relevant' if result == 1 else 'Not relevant'} (AI decision)")
+                                        # If not relevant, trigger close sequence with platform-aware hotkeys
+                                        if result == 0:
+                                            self._close_activity(activity)
+                                self.after(0, update_from_ai)
+                            threading.Thread(target=run_ai_check, args=(self.current_task, title), daemon=True).start()
+                            relevance = None
                         
-                        # If activity is not relevant, close it
+                        # If activity is not relevant from lists, close it immediately
                         if relevance == 0:
-                            import pyautogui
-                            pyautogui.PAUSE = 0.5  # Add a small delay between actions
-                            
-                            # Check if it's a browser by looking at the process name or window title
-                            title_lower = title.lower()
-                            is_browser = any(browser.lower() in title_lower for browser in browsers)
-                            
-                            if is_browser:
-                                # For browsers, close tab with Ctrl+W and open new tab with Ctrl+T
-                                print(f"Closing browser tab: {title}")
-                                pyautogui.hotkey('ctrl', 'w')
-                                pyautogui.hotkey('ctrl', 't')
-                            else:
-                                # For other applications, use Alt+F4
-                                print(f"Closing application: {title}")
-                                pyautogui.hotkey('alt', 'f4')
+                            self._close_activity(title)
                         
                         self.last_check_time = current_time
                         self.last_activity = title
 
         self.after(200, self.update_window_title)
+
+    def _close_activity(self, title):
+        """Close current activity with platform-aware shortcuts."""
+        import pyautogui
+        pyautogui.PAUSE = 0.5
+
+        title_lower = title.lower()
+        settings = config_manager.load_settings()
+        browsers = settings.get('browsers', [])
+        is_browser = any(browser.lower() in title_lower for browser in browsers)
+
+        is_mac = platform.system() == 'Darwin'
+
+        if is_browser:
+            print(f"Closing browser tab: {title}")
+            if is_mac:
+                pyautogui.hotkey('command', 'w')
+                pyautogui.hotkey('command', 't')
+            else:
+                pyautogui.hotkey('ctrl', 'w')
+                pyautogui.hotkey('ctrl', 't')
+        else:
+            print(f"Closing application: {title}")
+            if is_mac:
+                # macOS close window
+                pyautogui.hotkey('command', 'w')
+            else:
+                pyautogui.hotkey('alt', 'f4')
 
     def apply_loaded_settings(self):
         """Loads settings using config_manager and applies them to the UI."""
