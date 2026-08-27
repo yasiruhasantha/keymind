@@ -35,8 +35,12 @@ def get_default_settings():
     """
     Returns the default settings that should be used when creating a new settings file.
     """
+    is_mac = system_name == 'Darwin'
     return {
         "api_key": "",
+        # Key combinations used where the desktop cannot close a window directly.
+        "app_shortcut": "command+w" if is_mac else "alt+f4",
+        "tab_shortcut": "command+w" if is_mac else "ctrl+w",
         # Recognised browsers are closed a tab at a time instead of window-at-a-time.
         "browsers": [
             "chrome", "chromium", "firefox", "librewolf", "zen browser", "edge",
@@ -83,17 +87,20 @@ def ensure_config_directory_exists():
             print(f"Error creating default settings file: {e}")
             raise
 
-def save_settings(api_key, browsers, banned, allowed):
+def save_settings(api_key, browsers, banned, allowed, app_shortcut=None, tab_shortcut=None):
     """
     Saves the provided settings to the settings file in JSON format.
     """
     ensure_config_directory_exists()
+    defaults = get_default_settings()
 
     settings_data = {
         "api_key": api_key,
         "browsers": browsers,
         "banned": banned,
-        "allowed": allowed
+        "allowed": allowed,
+        "app_shortcut": app_shortcut or defaults["app_shortcut"],
+        "tab_shortcut": tab_shortcut or defaults["tab_shortcut"]
     }
 
     try:
@@ -137,6 +144,11 @@ def load_settings():
             # Ensure lists exist and are valid
             for key in ["browsers", "banned", "allowed"]:
                 if not isinstance(settings_data.get(key), list):
+                    settings_data[key] = default_settings[key]
+
+            # Settings files written by older versions have no shortcuts.
+            for key in ["app_shortcut", "tab_shortcut"]:
+                if not isinstance(settings_data.get(key), str) or not settings_data[key].strip():
                     settings_data[key] = default_settings[key]
 
             return settings_data

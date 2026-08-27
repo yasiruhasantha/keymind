@@ -3,6 +3,7 @@ import asyncio
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -38,6 +39,57 @@ def _warn_once(message):
     if message not in _warned:
         _warned.add(message)
         print(f"KeyMind: {message}", flush=True)
+
+
+# Keyboard shortcuts used to close things, in the user-facing "ctrl+w" notation.
+DEFAULT_TAB_SHORTCUT = 'command+w' if IS_MAC else 'ctrl+w'
+DEFAULT_APP_SHORTCUT = 'command+w' if IS_MAC else 'alt+f4'
+
+_MODIFIERS = {
+    'ctrl': 'ctrl', 'control': 'ctrl',
+    'alt': 'alt', 'option': 'alt', 'meta': 'alt',
+    'shift': 'shift',
+    'super': 'super', 'win': 'super', 'windows': 'super', 'cmd': 'super', 'command': 'super',
+}
+
+
+# Keys every backend understands: a single character, a function key, or a named key.
+_KEY_PATTERN = re.compile(
+    r'^([a-z0-9]|f[1-9][0-9]?|space|tab|escape|esc|enter|return|backspace|delete|'
+    r'home|end|up|down|left|right|pageup|pagedown)$')
+
+
+def parse_shortcut(shortcut, default):
+    """
+    Turn "super + w" into (['super'], 'w'). Falls back to the default when the user
+    typed something unusable, so a typo cannot stop KeyMind from closing anything.
+    """
+    for candidate in (shortcut, default):
+        parts = [part for part in re.split(r'[+\-\s]+', (candidate or '').lower()) if part]
+        if not parts:
+            continue
+        modifiers = [_MODIFIERS[part] for part in parts[:-1] if part in _MODIFIERS]
+        if len(modifiers) == len(parts) - 1 and _KEY_PATTERN.match(parts[-1]):
+            return modifiers, parts[-1]
+        if candidate == shortcut:
+            _warn_once(f"ignoring unrecognised shortcut {shortcut!r}; using {default!r}")
+    return [], 'w'
+
+
+def _shortcut_text(modifiers, key):
+    """Shortcut in the "ctrl+w" form understood by xdotool and ydotool."""
+    return '+'.join(modifiers + [key])
+
+
+def _wtype_command(modifiers, key):
+    """wtype presses and releases each modifier around the key it types."""
+    command = ['wtype']
+    for modifier in modifiers:
+        command += ['-M', modifier]
+    command += ['-k', key]
+    for modifier in modifiers:
+        command += ['-m', modifier]
+    return command
 
 
 # PyInstaller points the dynamic loader at its own bundled libraries; system helpers
@@ -488,15 +540,70 @@ class WindowMonitor:
             return title, process_name
         return None, None
 
-    def close_active_window(self, is_browser):
+    def _active_window_id_x11(self):
+        """Numeric X window id of the focused window, or None."""
+        disp = self._get_x_display()
+        if disp is not None:
+            try:
+                active = disp.screen().root.get_full_property(
+                    disp.intern_atom('_NET_ACTIVE_WINDOW'), 0)
+                if active and active.value:
+                    return int(active.value[0])
+            except Exception:
+                pass
+        output = _run(['xdotool', 'getactivewindow'])
+        if output and output.strip().isdigit():
+            return int(output.strip())
+        return None
+
+    def _close_active_window_x11(self, is_browser, modifiers, key):
+        """Close through xdotool so the packaged build does not depend on pyautogui."""
+        if not shutil.which('xdotool'):
+            return False
+        if is_browser:
+            # XTEST goes to whatever is focused; browsers ignore synthetic events that
+            # are addressed to a specific window id.
+            return (_run(['xdotool', 'key', '--clearmodifiers',
+                          _shortcut_text(modifiers, key)]) is not None
+                    and _run(['xdotool', 'key', '--clearmodifiers',
+                              _shortcut_text(modifiers, 't')]) is not None)
+        window_id = self._active_window_id_x11()
+        if window_id is None:
+            return False
+        return _run(['xdotool', 'windowclose', str(window_id)]) is not None
+
+    def terminate_active_process(self):
+        """
+        Last resort when no window manager could close the window: ask the process
+        behind it to quit.
+        """
+        pid = self.active_window_pid
+        if not pid or pid <= 1 or pid == self.own_pid:
+            return False
+        try:
+            psutil.Process(pid).terminate()
+            return True
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess) as error:
+            _warn_once(f"could not terminate pid {pid}: {error}")
+            return False
+
+    def close_active_window(self, is_browser, shortcut=None):
         """
         Close the active window, or just its current tab when it is a browser.
-        Returns True if the close was dispatched through a compositor, False when the
-        caller should fall back to synthetic key presses (pyautogui).
+        `shortcut` is the user's key combination, only used where the desktop has no
+        way to close a window directly. Returns True if the close was dispatched, False
+        when the caller should fall back to synthetic key presses or to terminating the
+        process.
         """
         if self.is_own_window():
             # Never let KeyMind close its own window.
             return False
+
+        default = DEFAULT_TAB_SHORTCUT if is_browser else DEFAULT_APP_SHORTCUT
+        modifiers, key = parse_shortcut(shortcut, default)
+
+        if self.linux_backend == 'x11':
+            return self._close_active_window_x11(is_browser, modifiers, key)
 
         if self.linux_backend == 'hyprland':
             address = self._get_active_window_hyprland().get('address')
@@ -506,30 +613,37 @@ class WindowMonitor:
             if is_browser:
                 # Hyprland can inject the shortcut straight into the window; addressing it
                 # explicitly also works on versions without the `activewindow` target.
-                return (_hyprctl_dispatch('sendshortcut', f'CTRL,W,address:{address}')
-                        and _hyprctl_dispatch('sendshortcut', f'CTRL,T,address:{address}'))
+                # Hyprland takes an empty modifier field when there is no modifier.
+                mods = ' '.join(modifier.upper() for modifier in modifiers)
+                if (_hyprctl_dispatch('sendshortcut', f'{mods},{key},address:{address}')
+                        and _hyprctl_dispatch('sendshortcut', f'{mods},t,address:{address}')):
+                    return True
+                # sendshortcut is missing on older Hyprland versions; the window itself can
+                # still be closed.
+                _warn_once("closing the whole browser window: hyprctl could not send the "
+                           "tab-close shortcut")
             return _hyprctl_dispatch('closewindow', f'address:{address}')
 
         if self.linux_backend == 'sway':
             if is_browser:
                 if shutil.which('wtype'):
-                    return (_run(['wtype', '-M', 'ctrl', '-k', 'w', '-m', 'ctrl']) is not None
-                            and _run(['wtype', '-M', 'ctrl', '-k', 't', '-m', 'ctrl']) is not None)
-                _warn_once("cannot close browser tabs on sway without wtype installed "
-                           "(https://github.com/atx/wtype)")
-                return False
+                    return (_run(_wtype_command(modifiers, key)) is not None
+                            and _run(_wtype_command(modifiers, 't')) is not None)
+                # Without a key injector a single tab cannot be singled out, so the whole
+                # browser window goes rather than leaving the distraction open.
+                _warn_once("closing the whole browser window: closing one tab on sway needs "
+                           "wtype (https://github.com/atx/wtype)")
             return _run(['swaymsg', 'kill']) is not None
 
         if self.linux_backend == 'gnome-window-calls':
             if is_browser:
                 # The extension cannot type; tab closing needs a uinput-based key injector.
                 if shutil.which('ydotool'):
-                    return (_run(['ydotool', 'key', 'ctrl+w']) is not None
-                            and _run(['ydotool', 'key', 'ctrl+t']) is not None)
-                _warn_once("cannot close browser tabs on GNOME Wayland without ydotool "
-                           "installed (https://github.com/ReimuNotMoe/ydotool); leaving the "
-                           "browser open")
-                return False
+                    return (_run(['ydotool', 'key', _shortcut_text(modifiers, key)]) is not None
+                            and _run(['ydotool', 'key',
+                                      _shortcut_text(modifiers, 't')]) is not None)
+                _warn_once("closing the whole browser window: closing one tab on GNOME "
+                           "Wayland needs ydotool (https://github.com/ReimuNotMoe/ydotool)")
             window_id = self._get_focused_window_gnome().get('id')
             if window_id is None:
                 return False
