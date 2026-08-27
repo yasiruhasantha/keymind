@@ -9,3 +9,6 @@ pywin32>=306; sys_platform == "win32"
 
 # macOS-specific
 pyobjc>=10.3; sys_platform == "darwin"
+
+# Linux-specific (X11 session required)
+python-xlib>=0.33; sys_platform == "linux"

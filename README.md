@@ -13,7 +13,7 @@ KeyMind is an AI-powered focus management tool that helps you maintain productiv
 ## Requirements
 
 - Google Gemini API key
-- Windows or macOS (Linux support coming soon)
+- Windows, macOS, or Linux (X11 session)
 
 ## Installation
 
@@ -25,10 +25,40 @@ KeyMind is an AI-powered focus management tool that helps you maintain productiv
 
 4. Bypass Gatekeeper (macOS only) – Watch this [video](https://youtu.be/biIvAM94b98) (There is no security risk because this is open source and will not try to steal your data or anything)
 
+### Linux
+
+There is no prebuilt release for Linux yet, so run it from source:
+
+```bash
+git clone https://github.com/yasiruhasantha/keymind.git
+cd keymind
+pip install -r requirements.txt
+python main.py
+```
+
+You may also need your distribution's Tk package for the UI (e.g. `sudo apt install python3-tk`).
+
+#### Session support
+
+Wayland has no generic way for an app to see other windows, so each compositor is handled through its own
+IPC:
+
+| Session | Window detection | Closing apps | Closing browser tabs |
+| --- | --- | --- | --- |
+| X11 / Xorg | `python-xlib` (or `xdotool`) | yes | yes |
+| Hyprland | `hyprctl` | yes | yes (`hyprctl dispatch sendshortcut`) |
+| sway | `swaymsg` | yes | needs [`wtype`](https://github.com/atx/wtype) |
+| GNOME Wayland | [Window Calls](https://extensions.gnome.org/extension/4724/window-calls/) extension | yes | needs [`ydotool`](https://github.com/ReimuNotMoe/ydotool) |
+| Other Wayland compositors | not supported | — | — |
+
+On Ubuntu (GNOME Wayland by default) either install the Window Calls extension, or choose **Ubuntu on Xorg**
+from the gear menu at the login screen. If none of the above is available, KeyMind prints a warning at
+startup and reports no activity.
+
 
 ## Configuration
 
-The application can be configured through the settings tab in the UI. Settings are stored in `user_config/settings.json`, which is automatically created with secure defaults when you first run the application.
+The application can be configured through the settings tab in the UI. Settings are stored in `user_config/settings.json`, which is automatically created with secure defaults when you first run the application. The `user_config` directory lives next to the application on Windows, in `~/Library/Application Support/KeyMind` on macOS, and in `~/.config/keymind` on Linux.
 
 You can customize your settings either through the UI or by directly editing `user_config/settings.json`:
 
@@ -58,7 +88,7 @@ You can customize your settings either through the UI or by directly editing `us
 
 ## Usage
 
-1. Start the application by running `KeyMind.exe` (Windows) or `python main.py` (macOS during development)
+1. Start the application by running `KeyMind.exe` (Windows) or `python main.py` (macOS and Linux)
 
 2. Enter your current task in the main window
    - Example: "Writing documentation for the project"
@@ -79,6 +109,7 @@ You can customize your settings either through the UI or by directly editing `us
 - pygetwindow>=0.0.9 (Windows)
 - pywin32>=306 (Windows)
 - pyobjc>=10.3 (macOS)
+- python-xlib>=0.33 (Linux)
 
 ## Development
 
