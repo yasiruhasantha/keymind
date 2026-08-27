@@ -5,6 +5,11 @@ import time
 import threading
 import platform
 
+# How often the active window is polled, and how long an activity has to stay focused
+# before it is judged (avoids closing windows the user only passed through).
+POLL_INTERVAL_MS = 300
+ACTIVITY_GRACE_SECONDS = 5
+
 # --- Appearance Settings ---
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("dark-blue")
@@ -27,7 +32,13 @@ class App(ctk.CTk):
 
         # Initialize window monitor
         self.window_monitor = WindowMonitor()
-        self.current_active_window_title = "Initializing..."
+        self.current_active_window_title = ""
+        self.activity_started_at = 0.0
+        self.activity_checked = True
+        self.monitoring_active = False
+        self.current_task = ""
+        # Remembers the verdict per activity so the AI is asked once per window title.
+        self.verdicts = {}
 
         self.setup_home_tab()
         self.setup_settings_tab()
@@ -40,95 +51,127 @@ class App(ctk.CTk):
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     def update_window_title(self):
-        """Update the displayed window title and check task relevance."""
-        from app_logic.task_checker import check_relevance
-        
+        """Poll the active window and judge it once it has been focused long enough."""
         title = self.window_monitor.get_active_window_title()
-        current_time = time.time()
-        if title and title != self.current_active_window_title:
+
+        if title != self.current_active_window_title:
             self.current_active_window_title = title
-            self.active_window_display_label.configure(text=title)
-            
-            # Check relevance if monitoring is active and we have a task
-            if hasattr(self, 'monitoring_active') and self.monitoring_active:
-                if hasattr(self, 'last_activity') and title != self.last_activity:
-                    # Wait 5 seconds before checking new activity
-                    if current_time - getattr(self, 'last_check_time', 0) >= 5:
-                        # Load current settings
-                        settings = config_manager.load_settings()
-                        allowed = settings.get('allowed', [])
-                        banned = settings.get('banned', [])
-                        browsers = settings.get('browsers', [])
+            self.active_window_display_label.configure(text=title or self.no_activity_text())
+            self.activity_started_at = time.time()
+            # A brand new activity always gets judged again, even if we saw it before.
+            self.activity_checked = title is None
 
-                        # Check if activity is in allowed list
-                        if any(allowed_app.lower() in title.lower() for allowed_app in allowed):
-                            print(f"Relevance check: {title} - Relevant (in allowed list)")
-                            relevance = 1
-                        # Check if activity is in banned list
-                        elif any(banned_app.lower() in title.lower() for banned_app in banned):
-                            print(f"Relevance check: {title} - Not relevant (in banned list)")
-                            relevance = 0
-                        # If not in either list, use AI to check relevance
-                        else:
-                            # Run AI call in a background thread to keep UI responsive
-                            def run_ai_check(task, activity):
-                                result = check_relevance(task, activity)
-                                def update_from_ai():
-                                    if result is not None and self.current_active_window_title == activity:
-                                        print(f"Relevance check: {activity} - {'Relevant' if result == 1 else 'Not relevant'} (AI decision)")
-                                        # If not relevant, trigger close sequence with platform-aware hotkeys
-                                        if result == 0:
-                                            self._close_activity(activity)
-                                self.after(0, update_from_ai)
-                            threading.Thread(target=run_ai_check, args=(self.current_task, title), daemon=True).start()
-                            relevance = None
-                        
-                        # If activity is not relevant from lists, close it immediately
-                        if relevance == 0:
-                            self._close_activity(title)
-                        
-                        self.last_check_time = current_time
-                        self.last_activity = title
+        backend_text = f"Watching windows via: {self.window_monitor.describe_backend()}"
+        if self.backend_label.cget("text") != backend_text:
+            self.backend_label.configure(text=backend_text)
 
-        self.after(200, self.update_window_title)
+        if (self.monitoring_active and title and not self.activity_checked
+                and time.time() - self.activity_started_at >= ACTIVITY_GRACE_SECONDS):
+            self.activity_checked = True
+            self.evaluate_activity(title)
+
+        self.after(POLL_INTERVAL_MS, self.update_window_title)
+
+    def no_activity_text(self):
+        """Message shown when the desktop does not tell us what is focused."""
+        if self.window_monitor.linux_backend == 'wayland-unsupported':
+            return ("Cannot read the active window on this Wayland compositor.\n"
+                    "Install the GNOME 'Window Calls' extension, or use Hyprland, sway or Xorg.")
+        return "No active window detected"
+
+    def evaluate_activity(self, title):
+        """Decide whether the focused activity is allowed, and close it if it is not."""
+        from app_logic.task_checker import check_relevance
+
+        if self.window_monitor.is_own_window():
+            return
+
+        settings = config_manager.load_settings()
+        title_lower = title.lower()
+
+        # Banned wins over allowed: the allowed list holds broad desktop-shell terms that
+        # would otherwise whitelist a banned app whose title happens to contain one.
+        if any(banned.lower() in title_lower for banned in settings.get('banned', [])):
+            print(f"Relevance check: {title} - Not relevant (in banned list)")
+            self.verdicts[title] = False
+            self._close_activity(title)
+            return
+
+        if any(allowed.lower() in title_lower for allowed in settings.get('allowed', [])):
+            print(f"Relevance check: {title} - Relevant (in allowed list)")
+            return
+
+        cached = self.verdicts.get(title)
+        if cached is not None:
+            # A cached "not relevant" is re-applied in case the previous close failed.
+            print(f"Relevance check: {title} - {'Relevant' if cached else 'Not relevant'} (cached)")
+            if not cached:
+                self._close_activity(title)
+            return
+
+        # Run the AI call in a background thread to keep the UI responsive.
+        def run_ai_check(task, activity):
+            result = check_relevance(task, activity)
+
+            def apply_result():
+                if result is None:
+                    return
+                self.verdicts[activity] = result == 1
+                print(f"Relevance check: {activity} - "
+                      f"{'Relevant' if result == 1 else 'Not relevant'} (AI decision)")
+                if result == 0 and self.current_active_window_title == activity:
+                    self._close_activity(activity)
+            self.after(0, apply_result)
+
+        threading.Thread(target=run_ai_check, args=(self.current_task, title), daemon=True).start()
 
     def _close_activity(self, title):
         """Close current activity with platform-aware shortcuts."""
-        import pyautogui
-        pyautogui.PAUSE = 0.5
-
         title_lower = title.lower()
         settings = config_manager.load_settings()
         browsers = settings.get('browsers', [])
         is_browser = any(browser.lower() in title_lower for browser in browsers)
+        what = 'browser tab' if is_browser else 'application'
 
         # Wayland compositors ignore synthetic key presses, so let the monitor try
         # its own IPC first and only fall back to pyautogui when it declines.
         if self.window_monitor.close_active_window(is_browser):
-            print(f"Closed {'browser tab' if is_browser else 'application'}: {title}")
+            print(f"Closed {what}: {title}")
             return
 
         if self.window_monitor.is_wayland:
-            print(f"Could not close {'browser tab' if is_browser else 'application'}: {title}")
+            print(f"Could not close {what}: {title}")
+            self._retry_activity_later()
             return
 
-        is_mac = platform.system() == 'Darwin'
+        # pyautogui needs a display server and is only imported on the fallback path,
+        # so a headless/Wayland session cannot break compositor-driven closing.
+        try:
+            import pyautogui
+        except Exception as error:
+            print(f"Could not close {what}: {error}")
+            self._retry_activity_later()
+            return
+        pyautogui.PAUSE = 0.5
 
+        is_mac = platform.system() == 'Darwin'
+        print(f"Closing {what}: {title}")
         if is_browser:
-            print(f"Closing browser tab: {title}")
             if is_mac:
                 pyautogui.hotkey('command', 'w')
                 pyautogui.hotkey('command', 't')
             else:
                 pyautogui.hotkey('ctrl', 'w')
                 pyautogui.hotkey('ctrl', 't')
+        elif is_mac:
+            pyautogui.hotkey('command', 'w')
         else:
-            print(f"Closing application: {title}")
-            if is_mac:
-                # macOS close window
-                pyautogui.hotkey('command', 'w')
-            else:
-                pyautogui.hotkey('alt', 'f4')
+            pyautogui.hotkey('alt', 'f4')
+
+    def _retry_activity_later(self):
+        """Re-judge the current activity after the grace period if closing failed."""
+        self.activity_checked = False
+        self.activity_started_at = time.time()
 
     def apply_loaded_settings(self):
         """Loads settings using config_manager and applies them to the UI."""
@@ -170,6 +213,7 @@ class App(ctk.CTk):
         home_frame.grid_rowconfigure(1, weight=1)
         home_frame.grid_rowconfigure(2, weight=1)
         home_frame.grid_rowconfigure(3, weight=1)
+        home_frame.grid_rowconfigure(4, weight=0)
         home_frame.grid_columnconfigure(0, weight=1)
 
         # Task label at the top
@@ -206,7 +250,17 @@ class App(ctk.CTk):
             font=ctk.CTkFont(size=20),
             wraplength=500
         )
-        self.active_window_display_label.grid(row=3, column=0, pady=(50, 20))
+        self.active_window_display_label.grid(row=3, column=0, pady=(50, 10))
+
+        # Which desktop integration is in use; the main thing to know when nothing
+        # is being detected.
+        self.backend_label = ctk.CTkLabel(
+            home_frame,
+            text=f"Watching windows via: {self.window_monitor.describe_backend()}",
+            font=ctk.CTkFont(size=12),
+            text_color="gray"
+        )
+        self.backend_label.grid(row=4, column=0, pady=(0, 20))
 
     def setup_settings_tab(self):
         settings_frame = self.tab_view.tab("settings")
@@ -305,8 +359,9 @@ class App(ctk.CTk):
                 
             print("Task started:", self.current_task)
             self.monitoring_active = True
-            self.last_check_time = 0
-            self.last_activity = ""
+            self.verdicts = {}
+            self.activity_started_at = time.time()
+            self.activity_checked = self.current_active_window_title is None
             self.start_button.configure(text="Stop")
         else:
             self.monitoring_active = False

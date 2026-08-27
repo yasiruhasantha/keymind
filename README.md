@@ -13,7 +13,7 @@ KeyMind is an AI-powered focus management tool that helps you maintain productiv
 ## Requirements
 
 - Google Gemini API key
-- Windows, macOS, or Linux (X11 session)
+- Windows, macOS, or Linux (X11, Hyprland, sway, or GNOME Wayland)
 
 ## Installation
 
@@ -27,7 +27,15 @@ KeyMind is an AI-powered focus management tool that helps you maintain productiv
 
 ### Linux
 
-There is no prebuilt release for Linux yet, so run it from source:
+Download `KeyMind-linux-x86_64.tar.gz` from the [Releases page](https://github.com/yasiruhasantha/keymind/releases),
+then:
+
+```bash
+tar -xzf KeyMind-linux-x86_64.tar.gz
+./KeyMind
+```
+
+Or run it from source:
 
 ```bash
 git clone https://github.com/yasiruhasantha/keymind.git
@@ -54,6 +62,10 @@ IPC:
 On Ubuntu (GNOME Wayland by default) either install the Window Calls extension, or choose **Ubuntu on Xorg**
 from the gear menu at the login screen. If none of the above is available, KeyMind prints a warning at
 startup and reports no activity.
+
+The home tab shows which of these is in use ("Watching windows via: …"), and KeyMind re-probes the desktop
+while it runs, so a compositor whose IPC was not ready at startup is picked up automatically. Start the app
+from a terminal to see the diagnostics it prints when a helper such as `hyprctl` cannot be reached.
 
 
 ## Configuration
@@ -91,6 +103,8 @@ You can customize your settings either through the UI or by directly editing `us
 1. Start the application by running `KeyMind.exe` (Windows) or `python main.py` (macOS and Linux)
 
 2. Enter your current task in the main window
+   - An activity has to stay focused for a few seconds before KeyMind judges it, and each activity is
+     judged once; banned entries always win over allowed ones, and KeyMind never closes its own window
    - Example: "Writing documentation for the project"
 
 3. Click "Start" to begin focus monitoring

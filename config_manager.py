@@ -37,7 +37,11 @@ def get_default_settings():
     """
     return {
         "api_key": "",
-        "browsers": [],
+        # Recognised browsers are closed a tab at a time instead of window-at-a-time.
+        "browsers": [
+            "chrome", "chromium", "firefox", "librewolf", "zen browser", "edge",
+            "brave", "vivaldi", "opera", "safari"
+        ],
         "banned": [],
         "allowed": [
             # Cross-platform/common
