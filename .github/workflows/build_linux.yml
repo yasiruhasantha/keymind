@@ -1,0 +1,73 @@
+name: Build KeyMind (Linux)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: read
+      actions: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build executable
+        run: |
+          python -m PyInstaller \
+            --onefile \
+            --noconsole \
+            --clean \
+            --collect-all customtkinter \
+            --collect-all google.generativeai \
+            --collect-all google \
+            --hidden-import Xlib \
+            --name KeyMind \
+            main.py
+          ls -la dist
+
+      - name: Package release archive
+        run: |
+          cd dist
+          tar -czf KeyMind-linux-x86_64.tar.gz KeyMind
+          ls -la
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: KeyMind-Linux
+          path: dist/KeyMind-linux-x86_64.tar.gz
+          if-no-files-found: error
+
+      - name: Upload to GitHub Release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/KeyMind-linux-x86_64.tar.gz
+          tag_name: v0.1.2
+          draft: false
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}

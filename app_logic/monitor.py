@@ -93,6 +93,9 @@ class WindowMonitor:
         self.previous_window_title = ""
         self._x_display = None
         self.linux_backend = detect_linux_backend()
+        # Wayland ignores synthetic key presses, so pyautogui is not a usable fallback there.
+        self.is_wayland = self.linux_backend in ('hyprland', 'sway', 'gnome-window-calls',
+                                                 'wayland-unsupported')
 
         if self.linux_backend == 'wayland-unsupported':
             print("Warning: this Wayland compositor does not expose the active window to "
@@ -254,6 +257,10 @@ class WindowMonitor:
             return title, process_name
         except Exception:
             # The window may disappear between the two calls, or the connection may drop.
+            try:
+                disp.close()
+            except Exception:
+                pass
             self._x_display = None
             return None, None
 
@@ -389,7 +396,7 @@ class WindowMonitor:
                             and _run(['ydotool', 'key', 'ctrl+t']) is not None)
                 print("Cannot close browser tabs on GNOME Wayland without ydotool installed; "
                       "leaving the browser open.")
-                return True
+                return False
             window_id = self._get_focused_window_gnome().get('id')
             if window_id is None:
                 return False

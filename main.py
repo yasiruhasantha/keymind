@@ -108,6 +108,10 @@ class App(ctk.CTk):
             print(f"Closed {'browser tab' if is_browser else 'application'}: {title}")
             return
 
+        if self.window_monitor.is_wayland:
+            print(f"Could not close {'browser tab' if is_browser else 'application'}: {title}")
+            return
+
         is_mac = platform.system() == 'Darwin'
 
         if is_browser:
