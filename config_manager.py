@@ -48,7 +48,11 @@ def get_default_settings():
             "windows defender", "windows security", "cmd", "powershell",
             # macOS (Finder, System Settings, Spotlight, etc.)
             "Finder", "System Settings", "Activity Monitor", "Spotlight", "Launchpad",
-            "Safari", "Terminal", "Console"
+            "Safari", "Terminal", "Console",
+            # Linux (desktop shells, file managers, settings, terminals)
+            "gnome-shell", "plasmashell", "xfdesktop", "nautilus", "files", "dolphin",
+            "thunar", "system monitor", "gnome-control-center", "systemsettings",
+            "gnome-terminal", "konsole", "xterm", "desktop"
         ]
     }
 
