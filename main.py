@@ -1,6 +1,7 @@
 import customtkinter as ctk
 import config_manager
 from app_logic import WindowMonitor
+from app_logic import monitor
 import time
 import threading
 import platform
@@ -9,6 +10,12 @@ import platform
 # before it is judged (avoids closing windows the user only passed through).
 POLL_INTERVAL_MS = 300
 ACTIVITY_GRACE_SECONDS = 5
+
+# pyautogui spells the Super/Command key differently per platform.
+PYAUTOGUI_MODIFIERS = {
+    'super': 'command' if platform.system() == 'Darwin' else (
+        'win' if platform.system() == 'Windows' else 'winleft')
+}
 
 # --- Appearance Settings ---
 ctk.set_appearance_mode("Dark")
@@ -136,14 +143,15 @@ class App(ctk.CTk):
         browsers = settings.get('browsers', [])
         is_browser = any(browser.lower() in title_lower for browser in browsers)
         what = 'browser tab' if is_browser else 'application'
+        shortcut = settings.get('tab_shortcut' if is_browser else 'app_shortcut')
 
         # Wayland compositors ignore synthetic key presses, so let the monitor try
         # its own IPC first and only fall back to pyautogui when it declines.
-        if self.window_monitor.close_active_window(is_browser):
+        if self.window_monitor.close_active_window(is_browser, shortcut):
             self._report_close(f"Closed {what}: {title}")
             return
 
-        if not self.window_monitor.is_wayland and self._close_with_pyautogui(is_browser):
+        if not self.window_monitor.is_wayland and self._close_with_pyautogui(is_browser, shortcut):
             self._report_close(f"Closed {what}: {title}")
             return
 
@@ -157,7 +165,7 @@ class App(ctk.CTk):
         self.set_status(f"Could not close {what}: {title} (see terminal for details)")
         self._retry_activity_later()
 
-    def _close_with_pyautogui(self, is_browser):
+    def _close_with_pyautogui(self, is_browser, shortcut):
         """Synthetic key presses; only usable on Windows, macOS and X11."""
         # pyautogui needs a display server and is only imported on the fallback path,
         # so a headless/Wayland session cannot break compositor-driven closing.
@@ -168,15 +176,14 @@ class App(ctk.CTk):
             return False
         pyautogui.PAUSE = 0.5
 
-        is_mac = platform.system() == 'Darwin'
+        default = monitor.DEFAULT_TAB_SHORTCUT if is_browser else monitor.DEFAULT_APP_SHORTCUT
+        modifiers, key = monitor.parse_shortcut(shortcut, default)
+        keys = [PYAUTOGUI_MODIFIERS.get(modifier, modifier) for modifier in modifiers]
         try:
+            pyautogui.hotkey(*keys, key)
             if is_browser:
-                pyautogui.hotkey('command' if is_mac else 'ctrl', 'w')
-                pyautogui.hotkey('command' if is_mac else 'ctrl', 't')
-            elif is_mac:
-                pyautogui.hotkey('command', 'w')
-            else:
-                pyautogui.hotkey('alt', 'f4')
+                # Reopen a tab so the browser itself survives closing its last one.
+                pyautogui.hotkey(*keys, 't')
         except Exception as error:
             print(f"pyautogui could not send the shortcut: {error}")
             return False
@@ -217,6 +224,12 @@ class App(ctk.CTk):
         allowed = loaded_config.get("allowed", [])
         if isinstance(allowed, list):
             self.allowed_entry.insert(0, ", ".join(allowed))
+
+        # Apply close shortcuts
+        self.app_shortcut_entry.delete(0, "end")
+        self.app_shortcut_entry.insert(0, loaded_config.get("app_shortcut", ""))
+        self.tab_shortcut_entry.delete(0, "end")
+        self.tab_shortcut_entry.insert(0, loaded_config.get("tab_shortcut", ""))
 
         print("Settings applied to UI.")
 
@@ -324,23 +337,40 @@ class App(ctk.CTk):
         self.allowed_entry = ctk.CTkEntry(settings_frame, placeholder_text="Enter comma-separated app names", width=350)
         self.allowed_entry.grid(row=3, column=1, padx=(0,20), pady=20, sticky="ew")
 
+        # Close shortcuts
+        app_shortcut_label = ctk.CTkLabel(settings_frame, text="Close app keys", anchor="w")
+        app_shortcut_label.grid(row=4, column=0, padx=(20,10), pady=20, sticky="w")
+
+        self.app_shortcut_entry = ctk.CTkEntry(settings_frame, placeholder_text="e.g. super+w", width=350)
+        self.app_shortcut_entry.grid(row=4, column=1, padx=(0,20), pady=20, sticky="ew")
+
+        tab_shortcut_label = ctk.CTkLabel(settings_frame, text="Close tab keys", anchor="w")
+        tab_shortcut_label.grid(row=5, column=0, padx=(20,10), pady=20, sticky="w")
+
+        self.tab_shortcut_entry = ctk.CTkEntry(settings_frame, placeholder_text="e.g. ctrl+w", width=350)
+        self.tab_shortcut_entry.grid(row=5, column=1, padx=(0,20), pady=20, sticky="ew")
+
         # Help text
         help_label = ctk.CTkLabel(
             settings_frame,
-            text="Note: Enter app and browser names as comma-separated values.\nExample: chrome, firefox, microsoft edge",
+            text=("Note: Enter app and browser names as comma-separated values.\n"
+                  "Example: chrome, firefox, microsoft edge\n"
+                  "Shortcuts look like ctrl+w, super+w or alt+f4. Hyprland, sway and GNOME\n"
+                  "close normal apps through the compositor, so the app keys are only used\n"
+                  "where that is not possible."),
             text_color="gray",
             justify="left"
         )
-        help_label.grid(row=4, column=0, columnspan=2, padx=20, pady=(0,20), sticky="w")
+        help_label.grid(row=6, column=0, columnspan=2, padx=20, pady=(0,20), sticky="w")
 
         # Spacer
         spacer_frame = ctk.CTkFrame(settings_frame, fg_color="transparent")
-        spacer_frame.grid(row=5, column=0, columnspan=2, sticky="nsew")
-        settings_frame.grid_rowconfigure(5, weight=1)
+        spacer_frame.grid(row=7, column=0, columnspan=2, sticky="nsew")
+        settings_frame.grid_rowconfigure(7, weight=1)
 
         # Buttons
         buttons_frame = ctk.CTkFrame(settings_frame, fg_color="transparent")
-        buttons_frame.grid(row=6, column=0, columnspan=2, padx=20, pady=(10,20), sticky="sw")
+        buttons_frame.grid(row=8, column=0, columnspan=2, padx=20, pady=(10,20), sticky="sw")
 
         save_button = ctk.CTkButton(
             buttons_frame,
@@ -368,8 +398,12 @@ class App(ctk.CTk):
         banned = [a.strip() for a in self.banned_entry.get().split(",") if a.strip()]
         allowed = [a.strip() for a in self.allowed_entry.get().split(",") if a.strip()]
 
+        app_shortcut = self.app_shortcut_entry.get().strip()
+        tab_shortcut = self.tab_shortcut_entry.get().strip()
+
         print("Saving settings...")
-        config_manager.save_settings(api_key, browsers, banned, allowed)
+        config_manager.save_settings(api_key, browsers, banned, allowed,
+                                     app_shortcut, tab_shortcut)
         print("Settings have been saved.")
 
     def on_cancel_button_press(self):

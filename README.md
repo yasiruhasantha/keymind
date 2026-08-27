@@ -79,6 +79,8 @@ You can customize your settings either through the UI or by directly editing `us
     "api_key": "YOUR_GEMINI_API_KEY",
     "browsers": ["firefox", "chrome"],
     "banned": ["games", "social media apps"],
+    "app_shortcut": "alt+f4",
+    "tab_shortcut": "ctrl+w",
     "allowed": [
         "new tab", "keymind", "explorer", "start", "shellhost",
         "shell", "taskbar", "task manager", "settings", "control panel",
@@ -97,6 +99,11 @@ You can customize your settings either through the UI or by directly editing `us
 - `browsers`: List of browser names to monitor (e.g., "firefox", "chrome")
 - `banned`: List of applications that will always be considered distracting
 - `allowed`: List of applications that will always be considered relevant (includes system essentials)
+- `app_shortcut`: Keys that close a normal application, e.g. `super+w` (default `alt+f4`, `command+w` on macOS)
+- `tab_shortcut`: Keys that close a browser tab, e.g. `ctrl+w`
+
+Hyprland, sway and GNOME close normal applications through the compositor, so `app_shortcut` is only used
+where that is not available (Windows, and X11 when the window manager refuses).
 
 ## Usage
 
