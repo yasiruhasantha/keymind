@@ -472,6 +472,7 @@ class WindowMonitor:
         if IS_WINDOWS:
             active_window = gw.getActiveWindow()
             if not active_window:
+                self.active_window_pid = None
                 return None, None
 
             title = active_window.title
@@ -488,6 +489,7 @@ class WindowMonitor:
                 # Frontmost application
                 front_app = NSWorkspace.sharedWorkspace().frontmostApplication()
                 app_name = str(front_app.localizedName()) if front_app else None
+                self.active_window_pid = int(front_app.processIdentifier()) if front_app else None
 
                 # Inspect on-screen windows and find the one owned by the front app
                 windows = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly, kCGNullWindowID) or []
@@ -511,6 +513,7 @@ class WindowMonitor:
                     return process_name, process_name
                 return None, None
             except Exception:
+                self.active_window_pid = None
                 return None, None
 
         if IS_LINUX:
