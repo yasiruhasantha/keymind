@@ -72,6 +72,10 @@ class App(ctk.CTk):
 
         self.after(POLL_INTERVAL_MS, self.update_window_title)
 
+    def set_status(self, message):
+        """Show what KeyMind is doing on the home tab."""
+        self.status_label.configure(text=message)
+
     def no_activity_text(self):
         """Message shown when the desktop does not tell us what is focused."""
         if self.window_monitor.linux_backend == 'wayland-unsupported':
@@ -136,37 +140,51 @@ class App(ctk.CTk):
         # Wayland compositors ignore synthetic key presses, so let the monitor try
         # its own IPC first and only fall back to pyautogui when it declines.
         if self.window_monitor.close_active_window(is_browser):
-            print(f"Closed {what}: {title}")
+            self._report_close(f"Closed {what}: {title}")
             return
 
-        if self.window_monitor.is_wayland:
-            print(f"Could not close {what}: {title}")
-            self._retry_activity_later()
+        if not self.window_monitor.is_wayland and self._close_with_pyautogui(is_browser):
+            self._report_close(f"Closed {what}: {title}")
             return
 
+        # Nothing could close the window itself, so ask the process behind it to quit;
+        # a browser is left alone because that would take every other tab with it.
+        if not is_browser and self.window_monitor.terminate_active_process():
+            self._report_close(f"Closed application: {title}")
+            return
+
+        print(f"Could not close {what}: {title}")
+        self.set_status(f"Could not close {what}: {title} (see terminal for details)")
+        self._retry_activity_later()
+
+    def _close_with_pyautogui(self, is_browser):
+        """Synthetic key presses; only usable on Windows, macOS and X11."""
         # pyautogui needs a display server and is only imported on the fallback path,
         # so a headless/Wayland session cannot break compositor-driven closing.
         try:
             import pyautogui
         except Exception as error:
-            print(f"Could not close {what}: {error}")
-            self._retry_activity_later()
-            return
+            print(f"pyautogui unavailable: {error}")
+            return False
         pyautogui.PAUSE = 0.5
 
         is_mac = platform.system() == 'Darwin'
-        print(f"Closing {what}: {title}")
-        if is_browser:
-            if is_mac:
+        try:
+            if is_browser:
+                pyautogui.hotkey('command' if is_mac else 'ctrl', 'w')
+                pyautogui.hotkey('command' if is_mac else 'ctrl', 't')
+            elif is_mac:
                 pyautogui.hotkey('command', 'w')
-                pyautogui.hotkey('command', 't')
             else:
-                pyautogui.hotkey('ctrl', 'w')
-                pyautogui.hotkey('ctrl', 't')
-        elif is_mac:
-            pyautogui.hotkey('command', 'w')
-        else:
-            pyautogui.hotkey('alt', 'f4')
+                pyautogui.hotkey('alt', 'f4')
+        except Exception as error:
+            print(f"pyautogui could not send the shortcut: {error}")
+            return False
+        return True
+
+    def _report_close(self, message):
+        print(message)
+        self.set_status(message)
 
     def _retry_activity_later(self):
         """Re-judge the current activity after the grace period if closing failed."""
@@ -214,6 +232,7 @@ class App(ctk.CTk):
         home_frame.grid_rowconfigure(2, weight=1)
         home_frame.grid_rowconfigure(3, weight=1)
         home_frame.grid_rowconfigure(4, weight=0)
+        home_frame.grid_rowconfigure(5, weight=0)
         home_frame.grid_columnconfigure(0, weight=1)
 
         # Task label at the top
@@ -260,7 +279,17 @@ class App(ctk.CTk):
             font=ctk.CTkFont(size=12),
             text_color="gray"
         )
-        self.backend_label.grid(row=4, column=0, pady=(0, 20))
+        self.backend_label.grid(row=4, column=0, pady=(0, 4))
+
+        # What KeyMind last did (or why it could not), so failures are not terminal-only.
+        self.status_label = ctk.CTkLabel(
+            home_frame,
+            text="Not monitoring",
+            font=ctk.CTkFont(size=12),
+            text_color="gray",
+            wraplength=500
+        )
+        self.status_label.grid(row=5, column=0, pady=(0, 20))
 
     def setup_settings_tab(self):
         settings_frame = self.tab_view.tab("settings")
@@ -352,12 +381,14 @@ class App(ctk.CTk):
     def on_start_button_press(self):
         """Handle start button press."""
         if self.start_button.cget("text") == "Start":
-            self.current_task = self.task_entry.get()
+            self.current_task = self.task_entry.get().strip()
             if not self.current_task:
                 print("Please enter a task first")
+                self.set_status("Enter a task first")
                 return
-                
+
             print("Task started:", self.current_task)
+            self.set_status(f"Monitoring for: {self.current_task}")
             self.monitoring_active = True
             self.verdicts = {}
             self.activity_started_at = time.time()
@@ -365,6 +396,7 @@ class App(ctk.CTk):
             self.start_button.configure(text="Stop")
         else:
             self.monitoring_active = False
+            self.set_status("Not monitoring")
             self.start_button.configure(text="Start")
 
 if __name__ == "__main__":
