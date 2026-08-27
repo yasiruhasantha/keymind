@@ -38,9 +38,22 @@ python main.py
 
 You may also need your distribution's Tk package for the UI (e.g. `sudo apt install python3-tk`).
 
-KeyMind reads the active window through X11, so log in to an **X11/Xorg session** — Wayland does not let
-applications see other windows' titles, and KeyMind will warn you and report no activity there. Window
-detection uses `python-xlib` and falls back to `xdotool` if it is installed.
+#### Session support
+
+Wayland has no generic way for an app to see other windows, so each compositor is handled through its own
+IPC:
+
+| Session | Window detection | Closing apps | Closing browser tabs |
+| --- | --- | --- | --- |
+| X11 / Xorg | `python-xlib` (or `xdotool`) | yes | yes |
+| Hyprland | `hyprctl` | yes | yes (`hyprctl dispatch sendshortcut`) |
+| sway | `swaymsg` | yes | needs [`wtype`](https://github.com/atx/wtype) |
+| GNOME Wayland | [Window Calls](https://extensions.gnome.org/extension/4724/window-calls/) extension | yes | needs [`ydotool`](https://github.com/ReimuNotMoe/ydotool) |
+| Other Wayland compositors | not supported | — | — |
+
+On Ubuntu (GNOME Wayland by default) either install the Window Calls extension, or choose **Ubuntu on Xorg**
+from the gear menu at the login screen. If none of the above is available, KeyMind prints a warning at
+startup and reports no activity.
 
 
 ## Configuration

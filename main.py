@@ -102,6 +102,12 @@ class App(ctk.CTk):
         browsers = settings.get('browsers', [])
         is_browser = any(browser.lower() in title_lower for browser in browsers)
 
+        # Wayland compositors ignore synthetic key presses, so let the monitor try
+        # its own IPC first and only fall back to pyautogui when it declines.
+        if self.window_monitor.close_active_window(is_browser):
+            print(f"Closed {'browser tab' if is_browser else 'application'}: {title}")
+            return
+
         is_mac = platform.system() == 'Darwin'
 
         if is_browser:
